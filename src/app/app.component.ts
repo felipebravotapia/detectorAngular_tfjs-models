@@ -1,4 +1,5 @@
 import { Component, ViewChild, ElementRef, OnInit } from '@angular/core';
+import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { DetectedObject } from '@tensorflow-models/coco-ssd';
 import '@tensorflow/tfjs-backend-cpu';
@@ -15,7 +16,7 @@ export class AppComponent implements OnInit {
   @ViewChild('video', { static: true }) video!: ElementRef<HTMLVideoElement>;
   @ViewChild('canvas', { static: true }) canvas!: ElementRef<HTMLCanvasElement>;
 
-  model: cocoSsd.ObjectDetection | any;
+  modelcocoSSD: cocoSsd.ObjectDetection | any;
   ctx!: CanvasRenderingContext2D | any;
   objects: DetectedObject[] = [];
   videoEl!: any;
@@ -25,15 +26,14 @@ export class AppComponent implements OnInit {
     // Obtener los elementos del DOM
     this.videoEl = this.video.nativeElement;
     this.canvasEl = this.canvas.nativeElement;
-    this.ctx = this.canvasEl.getContext('2d');
+
     if (Capacitor.isNativePlatform()) {
       this.startMobileCamera();
     } else {
       this.startWebCamera();
     }
-
     // Cargar el modelo coco-ssd
-    this.model = await cocoSsd.load();
+    this.modelcocoSSD = await cocoSsd.load();
   }
 
   async startMobileCamera() {
@@ -80,12 +80,17 @@ export class AppComponent implements OnInit {
   }
 
   async detectObjects() {
+    this.ctx = this.canvasEl.getContext('2d');
+
     // Obtener el elemento de video y dibujarlo en el canvas
     const videoEl = this.video.nativeElement;
     this.ctx.drawImage(videoEl, 0, 0);
 
     // Hacer la predicción con el modelo coco-ssd
-    const predictions: DetectedObject[] = await this.model.detect(videoEl);
+    const predictions: DetectedObject[] = await this.modelcocoSSD.detect(
+      videoEl
+    );
+
     const colors = [
       'rgba(255, 0, 0, 0.3)',
       'rgba(0, 255, 0, 0.3)',
@@ -94,35 +99,32 @@ export class AppComponent implements OnInit {
       'rgba(255, 0, 255, 0.3)',
     ];
 
+    // console.log(predictions);
+
     // Dibujar los rectángulos en el canvas
     predictions.forEach((prediction, i) => {
       const color = colors[i % colors.length];
       const [x, y, width, height] = prediction.bbox;
       this.ctx.strokeStyle = color;
-      this.ctx.lineWidth = 2;
+      this.ctx.lineWidth = 3;
       this.ctx.strokeRect(x, y, width, height);
       this.ctx.fillStyle = color;
     });
 
-    this.ctx.font = '20px Arial';
+    this.ctx.font = '25px Arial';
 
     this.objects = predictions;
+
     this.objects.forEach((prediction) => {
       const [x, y, width, height] = prediction.bbox;
       if (prediction.class !== 'person') {
         this.ctx.beginPath();
-        this.ctx.rect(...prediction.bbox);
-        this.ctx.lineWidth = 2;
-        /* this.ctx.strokeStyle = 'green';
-        this.ctx.fillStyle = 'green'; */
-
-        // this.ctx.fillRect(x, y, width, height);
-        // this.ctx.fillText(prediction.class, prediction.bbox[0], prediction.bbox[1] - 5);
+        // this.ctx.rect(...prediction.bbox);
 
         this.ctx.fillText(
           prediction.class + ' - ' + Math.round(prediction.score * 100) + '%',
           x,
-          y > width ? y - 5 : y + height
+          y > width ? y : y + height
         );
       }
     });
